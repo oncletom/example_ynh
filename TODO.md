@@ -1,0 +1,6 @@
+- Utiliser le port décidé par Yunohost
+- gérer les permissions de l'utilisateur au moment de lancer
+- décommenter "FR_FR.UTF8" dans /etc/locale.gen
+- modifier les README pour mettre les valeurs de description, auteurs, etc.
+- Regarder de plus près les fichiers de backup
+- regarder pour l'intégration mail
