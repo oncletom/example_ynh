@@ -181,22 +181,20 @@ ynh_add_systemd_config --others_var="port language"
 chown -R $app: $final_path
 
 # Set the app as temporarily public for curl call
+# Cf. https://yunohost.org/groups_and_permissions
 ynh_script_progression --message="Configuring SSOwat..." --time --weight=1
-ynh_app_setting_set --app=$app --key=skipped_uris --value="/"
+ynh_permission_update --permission "main" --add visitors
+
 # Reload SSOwat config
 yunohost app ssowatconf
 
 # Reload Nginx
 ynh_systemd_action --service_name=nginx --action=reload
 
-# Installation with curl
-ynh_script_progression --message="Finalizing installation..." --time --weight=1
-ynh_local_curl "/INSTALL_PATH" "key1=value1" "key2=value2" "key3=value3"
-
 # Remove the public access
 if [ $is_public -eq 0 ]
 then
-	ynh_app_setting_delete --app=$app --key=skipped_uris
+	ynh_permission_update --permission "main" --remove visitors
 fi
 
 #=================================================
@@ -215,7 +213,7 @@ fi
 ### you can make a backup of this file before modifying it again if the admin had modified it.
 
 # Calculate and store the config file checksum into the app settings
-ynh_store_file_checksum --file="$final_path/CONFIG_FILE"
+# ynh_store_file_checksum --file="$final_path/CONFIG_FILE"
 
 #=================================================
 # GENERIC FINALIZATION
@@ -285,22 +283,9 @@ ynh_script_progression --message="Starting a systemd service..." --time --weight
 
 ### `ynh_systemd_action` is used to start a systemd service for an app.
 ### Only needed if you have configure a systemd service
-### If you're not using these lines:
-###		- Remove the section "STOP SYSTEMD SERVICE" and "START SYSTEMD SERVICE" in the backup script
-###		- As well as the section "START SYSTEMD SERVICE" in the restore script
-###		- As well as the section"STOP SYSTEMD SERVICE" and "START SYSTEMD SERVICE" in the upgrade script
-###		- And the section "STOP SYSTEMD SERVICE" and "START SYSTEMD SERVICE" in the change_url script
 
 # Start a systemd service
 ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
-
-#=================================================
-# SETUP FAIL2BAN
-#=================================================
-# ynh_script_progression --message="Configuring fail2ban..." --time --weight=1
-
-# # Create a dedicated fail2ban config
-# ynh_add_fail2ban_config --logpath="/var/log/nginx/${domain}-error.log" --failregex="Regex to match into the log for a failed login"
 
 #=================================================
 # SETUP SSOWAT
@@ -311,7 +296,7 @@ ynh_script_progression --message="Configuring SSOwat..." --time --weight=1
 if [ $is_public -eq 1 ]
 then
 	# unprotected_uris allows SSO credentials to be passed anyway.
-	ynh_app_setting_set --app=$app --key=unprotected_uris --value="/"
+	ynh_permission_update --permission "main" --add visitors
 fi
 
 #=================================================
