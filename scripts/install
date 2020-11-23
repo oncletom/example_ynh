@@ -166,19 +166,7 @@ ynh_system_user_create --username=$app
 #=================================================
 ynh_script_progression --message="Configuring a systemd service..." --time --weight=1
 
-### `ynh_systemd_config` is used to configure a systemd script for an app.
-### It can be used for apps that use sysvinit (with adaptation) or systemd.
-### Have a look at the app to be sure this app needs a systemd script.
-### `ynh_systemd_config` will use the file conf/systemd.service
-### If you're not using these lines:
-###		- You can remove those files in conf/.
-###		- Remove the section "BACKUP SYSTEMD" in the backup script
-###		- Remove also the section "STOP AND REMOVE SERVICE" in the remove script
-###		- As well as the section "RESTORE SYSTEMD" in the restore script
-###		- And the section "SETUP SYSTEMD" in the upgrade script
-
-# Create a dedicated systemd config
-ynh_add_systemd_config
+ynh_add_systemd_config --others_var="port language"
 
 #=================================================
 # SETUP APPLICATION WITH CURL
@@ -242,6 +230,10 @@ ynh_store_file_checksum --file="$final_path/CONFIG_FILE"
 # Set permissions to app files
 chown -R root: $final_path
 
+mkdir -p $final_path/db
+touch $final_path/copanier-requests.log
+chown -R $app $final_path/{db,copanier-requests.log}
+
 #=================================================
 # SETUP LOGROTATE
 #=================================================
@@ -256,7 +248,7 @@ ynh_script_progression --message="Configuring log rotation..." --time --weight=1
 ###		- And the section "SETUP LOGROTATE" in the upgrade script
 
 # Use logrotate to manage application logfile(s)
-ynh_use_logrotate
+ynh_use_logrotate --logfile=$final_path/copanier-requests.log
 
 #=================================================
 # INTEGRATE SERVICE IN YUNOHOST
@@ -266,13 +258,8 @@ ynh_script_progression --message="Integrating service in YunoHost..." --time --w
 ### `yunohost service add` integrates a service in YunoHost. It then gets
 ### displayed in the admin interface and through the others `yunohost service` commands.
 ### (N.B. : this line only makes sense if the app adds a service to the system!)
-### If you're not using these lines:
-###		- You can remove these files in conf/.
-###		- Remove the section "REMOVE SERVICE INTEGRATION IN YUNOHOST" in the remove script
-###		- As well as the section "INTEGRATE SERVICE IN YUNOHOST" in the restore script
-###		- And the section "INTEGRATE SERVICE IN YUNOHOST" in the upgrade script
 
-yunohost service add $app --description "A short description of the app" --log "/var/log/$app/$app.log"
+yunohost service add $app --description "Logiciel de gestion des groupements d'achats" --log "$final_path/copanier-requests.log"
 
 ### Additional options starting with 3.8:
 ###
