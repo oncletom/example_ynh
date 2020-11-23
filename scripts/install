@@ -126,7 +126,13 @@ ynh_app_setting_set --app=$app --key=final_path --value=$final_path
 # Download, check integrity, uncompress and patch the source from app.src
 ynh_setup_source --dest_dir="$final_path"
 
+#=================================================
+# APP PYTHON DEPENDENCIES
+#=================================================
+ynh_script_progression --message="Installing app dependencies..." --time --weight=2
+
 python3 -m venv $final_path/venv
+$final_path/venv/bin/pip install --upgrade pip wheel
 $final_path/venv/bin/pip install -e $final_path
 
 #=================================================
