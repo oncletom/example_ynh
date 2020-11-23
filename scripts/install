@@ -103,17 +103,16 @@ ynh_app_setting_set --app=$app --key=port --value=$port
 #=================================================
 ynh_script_progression --message="Installing dependencies..." --time --weight=1
 
-### `ynh_install_app_dependencies` allows you to add any "apt" dependencies to the package.
-### Those deb packages will be installed as dependencies of this package.
-### If you're not using this helper:
-###		- Remove the section "REMOVE DEPENDENCIES" in the remove script
-###		- Remove the variable "pkg_dependencies" in _common.sh
-###		- As well as the section "REINSTALL DEPENDENCIES" in the restore script
-###		- And the section "UPGRADE DEPENDENCIES" in the upgrade script
 
 ynh_install_app_dependencies $pkg_dependencies
-locale-gen fr_FR.UTF-8
-dpkg-reconfigure locales
+
+#=================================================
+# SYSTEM LOCALES (can take a while)
+#=================================================
+ynh_script_progression --message="Generating system locales..." --time --weight=1
+
+ynh_replace_string --match_string="# $language.UTF-8 UTF-8" --replace_string="$language.UTF-8 UTF-8" --target_file=/etc/locale.gen
+locale-gen
 
 #=================================================
 # DOWNLOAD, CHECK AND UNPACK SOURCE
