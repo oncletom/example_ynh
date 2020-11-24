@@ -42,6 +42,9 @@ ynh_script_progression --message="Stopping and removing the systemd service..." 
 
 # Remove the dedicated systemd config
 ynh_remove_systemd_config
+systemctl stop $app.socket --quiet
+systemctl disable $app.socket --quiet
+rm /etc/systemd/system/$app.socket
 
 #=================================================
 # REMOVE DEPENDENCIES

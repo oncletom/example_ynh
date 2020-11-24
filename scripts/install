@@ -132,7 +132,7 @@ ynh_setup_source --dest_dir="$final_path"
 ynh_script_progression --message="Installing app dependencies..." --time --weight=2
 
 python3 -m venv $final_path/venv
-$final_path/venv/bin/pip install --upgrade pip wheel
+$final_path/venv/bin/pip install --upgrade pip wheel gunicorn
 $final_path/venv/bin/pip install -e $final_path
 
 #=================================================
@@ -164,9 +164,17 @@ ynh_system_user_create --username=$app
 #=================================================
 # SETUP SYSTEMD
 #=================================================
-ynh_script_progression --message="Configuring a systemd service..." --time --weight=1
+ynh_script_progression --message="Configuring a systemd service+socket..." --time --weight=1
 
-ynh_add_systemd_config --others_var="port language"
+socketfile="/etc/systemd/system/$app.socket"
+cp ../conf/systemd.socket "$socketfile"
+ynh_replace_string --match_string="__FINALPATH__" --replace_string="$final_path" --target_file="$socketfile"
+ynh_replace_string --match_string="__APP__" --replace_string="$app" --target_file="$socketfile"
+chown root: "$socketfile"
+
+ynh_add_systemd_config --service="$app" --others_var="language"
+systemctl start $app.socket --quiet
+systemctl enable $app.socket --quiet
 
 #=================================================
 # SETUP APPLICATION WITH CURL

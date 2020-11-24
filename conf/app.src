@@ -1,5 +1,5 @@
-SOURCE_URL=https://github.com/spiral-project/copanier/archive/466c2d1106ca9985aeed17da1f582385b42faf7f.zip
-SOURCE_SUM=b7444759f80b1a945810de6edde2480fb4901d90fec6aea096a0c7b6cce3c505
+SOURCE_URL=https://github.com/spiral-project/copanier/archive/45c76d57a5663d10bfc0466d8247641a504609eb.zip
+SOURCE_SUM=b392fc552c440ce23ee7cd8e32f662fbb7ac91ecbe1993e53bd621ea0d579a26
 SOURCE_SUM_PRG=sha256sum
 SOURCE_FORMAT=zip
 SOURCE_IN_SUBDIR=true
