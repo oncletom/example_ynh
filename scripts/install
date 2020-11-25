@@ -172,7 +172,7 @@ ynh_replace_string --match_string="__FINALPATH__" --replace_string="$final_path"
 ynh_replace_string --match_string="__APP__" --replace_string="$app" --target_file="$socketfile"
 chown root: "$socketfile"
 
-ynh_add_systemd_config --service="$app" --others_var="language"
+ynh_add_systemd_config --service="$app" --others_var="language domain path_url"
 systemctl start $app.socket --quiet
 systemctl enable $app.socket --quiet
 
