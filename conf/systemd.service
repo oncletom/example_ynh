@@ -12,6 +12,10 @@ ExecStart=__FINALPATH__/venv/bin/gunicorn -k roll.worker.Worker copanier:app --b
 Environment=COPANIER_LOG_ROOT=__FINALPATH__
 Environment=COPANIER_LOCALE=__LANGUAGE__.UTF-8
 Environment=COPANIER_SITE_URL=https://__DOMAIN____PATH_URL__
+Environment=COPANIER_FROM_EMAIL=__APP__@__DOMAIN__
+Environment=COPANIER_SMTP_HOST=localhost
+Environment=COPANIER_SMTP_LOGIN=
+Environment=COPANIER_SMTP_PASSWORD=
 
 [Install]
 WantedBy=multi-user.target
