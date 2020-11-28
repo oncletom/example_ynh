@@ -67,7 +67,10 @@ ynh_secure_remove --file="$final_path"
 #=================================================
 ynh_script_progression --message="Removing nginx web server configuration..." --time --weight=1
 
-# Remove the dedicated nginx config
+lua_script_dir="/usr/share/yunohost/other/copanier"
+lua_script_file="nginx-copanier.lua"
+
+rm "$lua_script_dir"
 ynh_remove_nginx_config
 
 #=================================================

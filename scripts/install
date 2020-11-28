@@ -102,7 +102,6 @@ ynh_app_setting_set --app=$app --key=port --value=$port
 #=================================================
 ynh_script_progression --message="Installing dependencies..." --time --weight=1
 
-
 ynh_install_app_dependencies $pkg_dependencies
 
 #=================================================
@@ -140,7 +139,19 @@ $final_path/venv/bin/pip install -e $final_path
 #=================================================
 ynh_script_progression --message="Configuring nginx web server..." --time --weight=1
 
-### `ynh_add_nginx_config` will use the file conf/nginx.conf
+lua_script_dir="/usr/share/yunohost/other/copanier"
+lua_script_file="nginx-copanier.lua"
+#jwt_secret_key=(ynh_string_random --length 12)
+jwt_secret_key="sikretfordevonly"
+
+mkdir -p $lua_script_dir
+cp ../conf/$lua_script_file "$lua_script_dir/$lua_script_file"
+
+ynh_replace_string --match_string="__APP__" --replace_string="$app" --target_file="$lua_script_dir/$lua_script_file"
+ynh_replace_string --match_string="__DOMAIN__" --replace_string="$domain" --target_file="$lua_script_dir/$lua_script_file"
+ynh_replace_string --match_string="__PATH_URL__" --replace_string="$path_url" --target_file="$lua_script_dir/$lua_script_file"
+ynh_replace_string --match_string="__SECRET_KEY__" --replace_string="$jwt_secret_key" --target_file="$lua_script_dir/$lua_script_file"
+chown www-data "$lua_script_dir/$lua_script_file"
 
 # Create a dedicated nginx config
 ynh_add_nginx_config
@@ -166,6 +177,7 @@ ynh_system_user_create --username=$app
 #=================================================
 ynh_script_progression --message="Configuring a systemd service+socket..." --time --weight=1
 
+systemdfile="/etc/systemd/system/$app.service"
 socketfile="/etc/systemd/system/$app.socket"
 cp ../conf/systemd.socket "$socketfile"
 ynh_replace_string --match_string="__FINALPATH__" --replace_string="$final_path" --target_file="$socketfile"
@@ -173,6 +185,7 @@ ynh_replace_string --match_string="__APP__" --replace_string="$app" --target_fil
 chown root: "$socketfile"
 
 ynh_add_systemd_config --service="$app" --others_var="language domain path_url"
+ynh_replace_string --match_string="__SECRET_KEY__" --replace_string="$jwt_secret_key" --target_file="$systemdfile"
 systemctl start $app.socket --quiet
 systemctl enable $app.socket --quiet
 
