@@ -42,6 +42,9 @@ ynh_script_progression --message="Stopping and removing the systemd service..." 
 
 # Remove the dedicated systemd config
 ynh_remove_systemd_config
+systemctl stop $app.socket --quiet
+systemctl disable $app.socket --quiet
+rm /etc/systemd/system/$app.socket
 
 #=================================================
 # REMOVE DEPENDENCIES
@@ -64,7 +67,10 @@ ynh_secure_remove --file="$final_path"
 #=================================================
 ynh_script_progression --message="Removing nginx web server configuration..." --time --weight=1
 
-# Remove the dedicated nginx config
+lua_script_dir="/usr/share/yunohost/other/copanier"
+lua_script_file="nginx-copanier.lua"
+
+rm "$lua_script_dir"
 ynh_remove_nginx_config
 
 #=================================================
@@ -88,10 +94,10 @@ fi
 #=================================================
 # REMOVE FAIL2BAN CONFIGURATION
 #=================================================
-ynh_script_progression --message="Removing fail2ban configuration..." --time --weight=1
+# ynh_script_progression --message="Removing fail2ban configuration..." --time --weight=1
 
 # Remove the dedicated fail2ban config
-ynh_remove_fail2ban_config
+# ynh_remove_fail2ban_config
 
 #=================================================
 # SPECIFIC REMOVE

@@ -1,0 +1,8 @@
+[Unit]
+Description=__APP__ socket service
+
+[Socket]
+ListenStream=__FINALPATH__/gunicorn.sock
+
+[Install]
+WantedBy=sockets.target

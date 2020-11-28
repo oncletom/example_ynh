@@ -26,10 +26,9 @@ ynh_abort_if_errors
 
 domain=$YNH_APP_ARG_DOMAIN
 path_url=$YNH_APP_ARG_PATH
-admin=$YNH_APP_ARG_ADMIN
+# admin=$YNH_APP_ARG_ADMIN
 is_public=$YNH_APP_ARG_IS_PUBLIC
-language="fr"
-#password=$YNH_APP_ARG_PASSWORD
+language="fr_FR"
 
 ### If it's a multi-instance app, meaning it can be installed several times independently
 ### The id of the app as stated in the manifest is available as $YNH_APP_ID
@@ -71,7 +70,7 @@ ynh_script_progression --message="Storing installation settings..." --time --wei
 
 ynh_app_setting_set --app=$app --key=domain --value=$domain
 ynh_app_setting_set --app=$app --key=path --value=$path_url
-ynh_app_setting_set --app=$app --key=admin --value=$admin
+# ynh_app_setting_set --app=$app --key=admin --value=$admin
 ynh_app_setting_set --app=$app --key=is_public --value=$is_public
 ynh_app_setting_set --app=$app --key=language --value=$language
 
@@ -103,17 +102,15 @@ ynh_app_setting_set --app=$app --key=port --value=$port
 #=================================================
 ynh_script_progression --message="Installing dependencies..." --time --weight=1
 
-### `ynh_install_app_dependencies` allows you to add any "apt" dependencies to the package.
-### Those deb packages will be installed as dependencies of this package.
-### If you're not using this helper:
-###		- Remove the section "REMOVE DEPENDENCIES" in the remove script
-###		- Remove the variable "pkg_dependencies" in _common.sh
-###		- As well as the section "REINSTALL DEPENDENCIES" in the restore script
-###		- And the section "UPGRADE DEPENDENCIES" in the upgrade script
-
 ynh_install_app_dependencies $pkg_dependencies
-locale-gen fr_FR.UTF-8
-dpkg-reconfigure locales
+
+#=================================================
+# SYSTEM LOCALES (can take a while)
+#=================================================
+ynh_script_progression --message="Generating system locales..." --time --weight=1
+
+ynh_replace_string --match_string="# $language.UTF-8 UTF-8" --replace_string="$language.UTF-8 UTF-8" --target_file=/etc/locale.gen
+locale-gen
 
 #=================================================
 # DOWNLOAD, CHECK AND UNPACK SOURCE
@@ -128,7 +125,13 @@ ynh_app_setting_set --app=$app --key=final_path --value=$final_path
 # Download, check integrity, uncompress and patch the source from app.src
 ynh_setup_source --dest_dir="$final_path"
 
+#=================================================
+# APP PYTHON DEPENDENCIES
+#=================================================
+ynh_script_progression --message="Installing app dependencies..." --time --weight=2
+
 python3 -m venv $final_path/venv
+$final_path/venv/bin/pip install --upgrade pip wheel gunicorn
 $final_path/venv/bin/pip install -e $final_path
 
 #=================================================
@@ -136,7 +139,19 @@ $final_path/venv/bin/pip install -e $final_path
 #=================================================
 ynh_script_progression --message="Configuring nginx web server..." --time --weight=1
 
-### `ynh_add_nginx_config` will use the file conf/nginx.conf
+lua_script_dir="/usr/share/yunohost/other/copanier"
+lua_script_file="nginx-copanier.lua"
+#jwt_secret_key=(ynh_string_random --length 12)
+jwt_secret_key="sikretfordevonly"
+
+mkdir -p $lua_script_dir
+cp ../conf/$lua_script_file "$lua_script_dir/$lua_script_file"
+
+ynh_replace_string --match_string="__APP__" --replace_string="$app" --target_file="$lua_script_dir/$lua_script_file"
+ynh_replace_string --match_string="__DOMAIN__" --replace_string="$domain" --target_file="$lua_script_dir/$lua_script_file"
+ynh_replace_string --match_string="__PATH_URL__" --replace_string="$path_url" --target_file="$lua_script_dir/$lua_script_file"
+ynh_replace_string --match_string="__SECRET_KEY__" --replace_string="$jwt_secret_key" --target_file="$lua_script_dir/$lua_script_file"
+chown www-data "$lua_script_dir/$lua_script_file"
 
 # Create a dedicated nginx config
 ynh_add_nginx_config
@@ -160,21 +175,19 @@ ynh_system_user_create --username=$app
 #=================================================
 # SETUP SYSTEMD
 #=================================================
-ynh_script_progression --message="Configuring a systemd service..." --time --weight=1
+ynh_script_progression --message="Configuring a systemd service+socket..." --time --weight=1
 
-### `ynh_systemd_config` is used to configure a systemd script for an app.
-### It can be used for apps that use sysvinit (with adaptation) or systemd.
-### Have a look at the app to be sure this app needs a systemd script.
-### `ynh_systemd_config` will use the file conf/systemd.service
-### If you're not using these lines:
-###		- You can remove those files in conf/.
-###		- Remove the section "BACKUP SYSTEMD" in the backup script
-###		- Remove also the section "STOP AND REMOVE SERVICE" in the remove script
-###		- As well as the section "RESTORE SYSTEMD" in the restore script
-###		- And the section "SETUP SYSTEMD" in the upgrade script
+systemdfile="/etc/systemd/system/$app.service"
+socketfile="/etc/systemd/system/$app.socket"
+cp ../conf/systemd.socket "$socketfile"
+ynh_replace_string --match_string="__FINALPATH__" --replace_string="$final_path" --target_file="$socketfile"
+ynh_replace_string --match_string="__APP__" --replace_string="$app" --target_file="$socketfile"
+chown root: "$socketfile"
 
-# Create a dedicated systemd config
-ynh_add_systemd_config
+ynh_add_systemd_config --service="$app" --others_var="language domain path_url"
+ynh_replace_string --match_string="__SECRET_KEY__" --replace_string="$jwt_secret_key" --target_file="$systemdfile"
+systemctl start $app.socket --quiet
+systemctl enable $app.socket --quiet
 
 #=================================================
 # SETUP APPLICATION WITH CURL
@@ -189,22 +202,20 @@ ynh_add_systemd_config
 chown -R $app: $final_path
 
 # Set the app as temporarily public for curl call
+# Cf. https://yunohost.org/groups_and_permissions
 ynh_script_progression --message="Configuring SSOwat..." --time --weight=1
-ynh_app_setting_set --app=$app --key=skipped_uris --value="/"
+ynh_permission_update --permission "main" --add visitors
+
 # Reload SSOwat config
 yunohost app ssowatconf
 
 # Reload Nginx
 ynh_systemd_action --service_name=nginx --action=reload
 
-# Installation with curl
-ynh_script_progression --message="Finalizing installation..." --time --weight=1
-ynh_local_curl "/INSTALL_PATH" "key1=value1" "key2=value2" "key3=value3"
-
 # Remove the public access
 if [ $is_public -eq 0 ]
 then
-	ynh_app_setting_delete --app=$app --key=skipped_uris
+	ynh_permission_update --permission "main" --remove visitors
 fi
 
 #=================================================
@@ -223,7 +234,7 @@ fi
 ### you can make a backup of this file before modifying it again if the admin had modified it.
 
 # Calculate and store the config file checksum into the app settings
-ynh_store_file_checksum --file="$final_path/CONFIG_FILE"
+# ynh_store_file_checksum --file="$final_path/CONFIG_FILE"
 
 #=================================================
 # GENERIC FINALIZATION
@@ -237,6 +248,10 @@ ynh_store_file_checksum --file="$final_path/CONFIG_FILE"
 
 # Set permissions to app files
 chown -R root: $final_path
+
+mkdir -p $final_path/db
+touch $final_path/copanier-requests.log
+chown -R $app $final_path/{db,copanier-requests.log}
 
 #=================================================
 # SETUP LOGROTATE
@@ -252,7 +267,7 @@ ynh_script_progression --message="Configuring log rotation..." --time --weight=1
 ###		- And the section "SETUP LOGROTATE" in the upgrade script
 
 # Use logrotate to manage application logfile(s)
-ynh_use_logrotate
+ynh_use_logrotate --logfile=$final_path/copanier-requests.log
 
 #=================================================
 # INTEGRATE SERVICE IN YUNOHOST
@@ -262,13 +277,8 @@ ynh_script_progression --message="Integrating service in YunoHost..." --time --w
 ### `yunohost service add` integrates a service in YunoHost. It then gets
 ### displayed in the admin interface and through the others `yunohost service` commands.
 ### (N.B. : this line only makes sense if the app adds a service to the system!)
-### If you're not using these lines:
-###		- You can remove these files in conf/.
-###		- Remove the section "REMOVE SERVICE INTEGRATION IN YUNOHOST" in the remove script
-###		- As well as the section "INTEGRATE SERVICE IN YUNOHOST" in the restore script
-###		- And the section "INTEGRATE SERVICE IN YUNOHOST" in the upgrade script
 
-yunohost service add $app --description "A short description of the app" --log "/var/log/$app/$app.log"
+yunohost service add $app --description "Logiciel de gestion des groupements d'achats" --log "$final_path/copanier-requests.log"
 
 ### Additional options starting with 3.8:
 ###
@@ -294,22 +304,9 @@ ynh_script_progression --message="Starting a systemd service..." --time --weight
 
 ### `ynh_systemd_action` is used to start a systemd service for an app.
 ### Only needed if you have configure a systemd service
-### If you're not using these lines:
-###		- Remove the section "STOP SYSTEMD SERVICE" and "START SYSTEMD SERVICE" in the backup script
-###		- As well as the section "START SYSTEMD SERVICE" in the restore script
-###		- As well as the section"STOP SYSTEMD SERVICE" and "START SYSTEMD SERVICE" in the upgrade script
-###		- And the section "STOP SYSTEMD SERVICE" and "START SYSTEMD SERVICE" in the change_url script
 
 # Start a systemd service
 ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
-
-#=================================================
-# SETUP FAIL2BAN
-#=================================================
-# ynh_script_progression --message="Configuring fail2ban..." --time --weight=1
-
-# # Create a dedicated fail2ban config
-# ynh_add_fail2ban_config --logpath="/var/log/nginx/${domain}-error.log" --failregex="Regex to match into the log for a failed login"
 
 #=================================================
 # SETUP SSOWAT
@@ -320,7 +317,7 @@ ynh_script_progression --message="Configuring SSOwat..." --time --weight=1
 if [ $is_public -eq 1 ]
 then
 	# unprotected_uris allows SSO credentials to be passed anyway.
-	ynh_app_setting_set --app=$app --key=unprotected_uris --value="/"
+	ynh_permission_update --permission "main" --add visitors
 fi
 
 #=================================================
@@ -335,5 +332,3 @@ ynh_systemd_action --service_name=nginx --action=reload
 #=================================================
 
 ynh_script_progression --message="Installation of $app completed" --time --last
-
-# TEst
